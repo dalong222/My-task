@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>트랜스포머 — 어텐션 체험</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f13;
+    --bg2: #17171e;
+    --bg3: #1e1e28;
+    --border: rgba(255,255,255,0.08);
+    --purple: #8b7fff;
+    --purple-dim: rgba(139,127,255,0.15);
+    --purple-mid: rgba(139,127,255,0.4);
+    --text: #e8e8f0;
+    --text-muted: #888899;
+    --text-dim: #555566;
+    --amber: #f0a500;
+    --teal: #3ecfaa;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+
+  .header .eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .18em;
+    color: var(--purple);
+    text-transform: uppercase;
+    margin-bottom: .75rem;
+  }
+
+  .header h1 {
+    font-size: clamp(22px, 4vw, 34px);
+    font-weight: 700;
+    letter-spacing: -.02em;
+    line-height: 1.2;
+    margin-bottom: .5rem;
+  }
+
+  .header h1 span { color: var(--purple); }
+
+  .header p {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 680px;
+    margin-bottom: 1rem;
+  }
+
+  .section-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .12em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 1.25rem;
+  }
+
+  /* Token row */
+  .token-row {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 1.75rem;
+  }
+
+  .token {
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1.5px solid var(--border);
+    background: var(--bg3);
+    color: var(--text-muted);
+    transition: all .2s cubic-bezier(.4,0,.2,1);
+    user-select: none;
+    letter-spacing: -.01em;
+  }
+
+  .token:hover {
+    border-color: var(--purple-mid);
+    color: var(--text);
+    background: var(--purple-dim);
+  }
+
+  .token.active {
+    background: var(--purple);
+    border-color: var(--purple);
+    color: #fff;
+    transform: translateY(-2px);
+  }
+
+  /* Canvas */
+  .canvas-wrap {
+    position: relative;
+    margin-bottom: 1.25rem;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    border-radius: 8px;
+  }
+
+  /* Weight bars */
+  .weight-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 1.5rem;
+  }
+
+  .weight-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .weight-word {
+    font-size: 13px;
+    font-weight: 500;
+    width: 72px;
+    flex-shrink: 0;
+    color: var(--text-muted);
+    text-align: right;
+    transition: color .2s;
+  }
+
+  .weight-word.self { color: var(--purple); }
+
+  .weight-bar-bg {
+    flex: 1;
+    height: 6px;
+    background: var(--bg3);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .weight-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--purple);
+    transition: width .5s cubic-bezier(.4,0,.2,1), opacity .3s;
+  }
+
+  .weight-pct {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    width: 36px;
+    text-align: right;
+    flex-shrink: 0;
+    transition: color .2s;
+  }
+
+  .weight-pct.high { color: var(--purple); }
+
+  /* Insight */
+  .insight {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--purple);
+    border-radius: 0 10px 10px 0;
+    padding: .875rem 1rem;
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.8;
+    min-height: 56px;
+    transition: all .3s;
+  }
+
+  .insight strong { color: var(--text); font-weight: 500; }
+  .insight.empty { color: var(--text-dim); font-style: italic; }
+
+  /* Divider */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 1.5rem 0;
+  }
+
+  /* Compare */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .compare-box {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+  }
+
+  .compare-box.highlight { border-color: var(--purple-mid); }
+
+  .compare-title {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .04em;
+    margin-bottom: .5rem;
+  }
+
+  .compare-title.muted { color: var(--text-dim); }
+  .compare-title.accent { color: var(--purple); }
+
+  .compare-body {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+
+  /* Summary */
+  .summary-box {
+    background: var(--purple-dim);
+    border: 1px solid var(--purple-mid);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.8;
+    text-align: center;
+  }
+
+  .summary-box strong { color: var(--purple); }
+
+  /* Hint */
+  .hint {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: .75rem;
+    letter-spacing: .01em;
+  }
+
+  /* Pulse animation for first load */
+  @keyframes pulse-border {
+    0%, 100% { border-color: var(--border); }
+    50% { border-color: var(--purple-mid); }
+  }
+
+  .token.hint-pulse {
+    animation: pulse-border 1.5s ease-in-out 3;
+  }
+
+  @media (max-width: 520px) {
+    .card { padding: 1.25rem; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .token { padding: 8px 13px; font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="eyebrow">Transformer · Attention Mechanism</div>
+  <h1>문장 안 단어들은<br>서로 어떻게 <span>연결</span>될까?</h1>
+  <p>트랜스포머가 문장을 이해하는 방식을 직접 체험해보세요</p>
+</div>
+
+<div class="card">
+  <div class="section-label">단어를 클릭하세요</div>
+
+  <div class="token-row" id="tokens"></div>
+
+  <div class="canvas-wrap">
+    <canvas id="attn-canvas" height="80"></canvas>
+  </div>
+
+  <div class="weight-grid" id="weight-grid"></div>
+
+  <div class="insight empty" id="insight">
+    단어를 클릭하면 트랜스포머가 그 단어를 이해할 때 어떤 단어에 주목하는지 볼 수 있어요.
+  </div>
+
+  <div class="hint" id="hint">위 단어를 눌러보세요 ↑</div>
+</div>
+
+<div class="card">
+  <div class="section-label">이전 방식 vs 트랜스포머</div>
+  <div class="compare-grid">
+    <div class="compare-box">
+      <div class="compare-title muted">이전 방식 (RNN)</div>
+      <div class="compare-body">단어를 하나씩 순서대로 읽습니다. 앞 내용을 기억하면서 뒤로 이동하는데, 문장이 길면 앞 내용을 잊어버립니다.</div>
+    </div>
+    <div class="compare-box highlight">
+      <div class="compare-title accent">트랜스포머 (Attention)</div>
+      <div class="compare-body">문장 전체를 한 번에 봅니다. 모든 단어가 동시에 서로를 참조하고, 거리와 상관없이 관련 단어에 주목할 수 있습니다.</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="summary-box">
+    논문 제목 <strong>"Attention is All You Need"</strong>의 의미:<br>
+    복잡한 구조 없이, 이 어텐션 메커니즘 하나면 충분하다는 선언.<br>
+    오늘날 GPT · Claude · Gemini 모두 이 구조 위에 세워졌습니다.
+  </div>
+</div>
+
+<script>
+const WORDS = ['나는', '어제', '은행에서', '돈을', '찾았다'];
+
+const DATA = {
+  0: {
+    w: [1.0, 0.15, 0.25, 0.65, 0.90],
+    text: '"나는" — <strong>주어</strong>입니다. 동사인 <strong>찾았다</strong>와 강하게 연결되고, 무엇을 했는지 이해하기 위해 <strong>돈을</strong>도 참고합니다.'
+  },
+  1: {
+    w: [0.18, 1.0, 0.12, 0.10, 0.60],
+    text: '"어제" — <strong>시간 부사</strong>입니다. 행위(<strong>찾았다</strong>)와 주로 연결되고, 나머지 단어와의 관련성은 낮습니다.'
+  },
+  2: {
+    w: [0.22, 0.10, 1.0, 0.82, 0.78],
+    text: '"은행에서" — <strong>장소</strong>입니다. <strong>돈을·찾았다</strong>와 강하게 연결되어 "금융 행위"라는 맥락을 결정합니다. 이 연결이 없으면 강가인지 은행인지 알 수 없어요.'
+  },
+  3: {
+    w: [0.55, 0.10, 0.82, 1.0, 0.88],
+    text: '"돈을" — <strong>목적어</strong>입니다. <strong>찾았다</strong>(행위)와 <strong>은행에서</strong>(장소) 모두에 강하게 주목해 "어디서 무엇을 했나"를 구성합니다.'
+  },
+  4: {
+    w: [0.88, 0.42, 0.78, 0.88, 1.0],
+    text: '"찾았다" — <strong>동사이자 핵심</strong>입니다. 주어(<strong>나는</strong>), 장소(<strong>은행에서</strong>), 목적어(<strong>돈을</strong>) 모두에 높은 주목도를 보입니다.'
+  }
+};
+
+let selected = null;
+
+/* Build token buttons */
+const tokensEl = document.getElementById('tokens');
+WORDS.forEach((w, i) => {
+  const el = document.createElement('div');
+  el.className = 'token' + (i === 0 ? ' hint-pulse' : '');
+  el.textContent = w;
+  el.addEventListener('click', () => select(i));
+  tokensEl.appendChild(el);
+});
+
+/* Build weight bars */
+const weightGrid = document.getElementById('weight-grid');
+WORDS.forEach((w, i) => {
+  const row = document.createElement('div');
+  row.className = 'weight-row';
+  row.innerHTML = `
+    <div class="weight-word" id="ww-${i}">${w}</div>
+    <div class="weight-bar-bg"><div class="weight-bar-fill" id="wb-${i}" style="width:0%;opacity:0.3"></div></div>
+    <div class="weight-pct" id="wp-${i}">—</div>
+  `;
+  weightGrid.appendChild(row);
+});
+
+/* Canvas */
+const canvas = document.getElementById('attn-canvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  const W = canvas.parentElement.offsetWidth;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = W * dpr;
+  canvas.height = 80 * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = '80px';
+  ctx.scale(dpr, dpr);
+  draw(selected);
+}
+
+function draw(sel) {
+  const W = canvas.parentElement.offsetWidth;
+  const H = 80;
+  ctx.clearRect(0, 0, W, H);
+
+  const n = WORDS.length;
+  const pad = 44;
+  const sp = (W - pad * 2) / (n - 1);
+  const xs = WORDS.map((_, i) => pad + i * sp);
+  const CY = 42;
+
+  if (sel === null) {
+    xs.forEach(x => {
+      ctx.beginPath();
+      ctx.arc(x, CY, 5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(139,127,255,0.2)';
+      ctx.fill();
+    });
+    return;
+  }
+
+  const ws = DATA[sel].w;
+
+  xs.forEach((x2, j) => {
+    if (j === sel) return;
+    const x1 = xs[sel];
+    const w = ws[j];
+    if (w < 0.08) return;
+    const lift = 34 * w;
+    const mx = (x1 + x2) / 2;
+
+    ctx.beginPath();
+    ctx.moveTo(x1, CY);
+    ctx.quadraticCurveTo(mx, CY - lift, x2, CY);
+    ctx.strokeStyle = '#8b7fff';
+    ctx.lineWidth = Math.max(1, w * 4.5);
+    ctx.globalAlpha = 0.12 + w * 0.78;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  });
+
+  xs.forEach((x, i) => {
+    const r = i === sel ? 9 : 5;
+    const alpha = i === sel ? 1 : 0.15 + ws[i] * 0.7;
+    ctx.beginPath();
+    ctx.arc(x, CY, r, 0, Math.PI * 2);
+    ctx.fillStyle = '#8b7fff';
+    ctx.globalAlpha = alpha;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  });
+}
+
+function select(i) {
+  selected = i;
+  document.getElementById('hint').style.opacity = '0';
+
+  document.querySelectorAll('.token').forEach((el, j) => {
+    el.classList.toggle('active', j === i);
+    el.classList.remove('hint-pulse');
+  });
+
+  draw(i);
+
+  const ws = DATA[i].w;
+  WORDS.forEach((_, j) => {
+    const pct = Math.round(ws[j] * 100);
+    const fill = document.getElementById(`wb-${j}`);
+    const word = document.getElementById(`ww-${j}`);
+    const pctEl = document.getElementById(`wp-${j}`);
+
+    fill.style.width = pct + '%';
+    fill.style.opacity = 0.2 + ws[j] * 0.8;
+
+    word.classList.toggle('self', j === i);
+    pctEl.textContent = pct + '%';
+    pctEl.classList.toggle('high', pct >= 70);
+  });
+
+  const insightEl = document.getElementById('insight');
+  insightEl.classList.remove('empty');
+  insightEl.innerHTML = DATA[i].text;
+}
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+</script>
+</body>
+</html>
